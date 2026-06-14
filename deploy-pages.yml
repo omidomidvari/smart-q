@@ -1,0 +1,160 @@
+name: Deploy SmartQ to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install gunicorn
+    
+    - name: Build static site
+      run: |
+        mkdir -p _site
+        cp -r templates _site/
+        cp -r static _site/
+        cp transformer_chatbot.py _site/
+        cp app.py _site/
+        cp requirements.txt _site/
+    
+    - name: Create index redirect
+      run: |
+        cat > _site/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>🤖 SmartQ - AI Assistant</title>
+            <link rel="stylesheet" href="static/style.css">
+            <style>
+                body {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100vh;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                }
+                .welcome-box {
+                    background: white;
+                    padding: 40px;
+                    border-radius: 10px;
+                    text-align: center;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+                }
+                .welcome-box h1 {
+                    margin: 0 0 20px 0;
+                    color: #1a202c;
+                }
+                .welcome-box p {
+                    color: #4a5568;
+                    margin: 10px 0;
+                }
+                .welcome-box a {
+                    display: inline-block;
+                    margin-top: 20px;
+                    padding: 12px 30px;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 6px;
+                    font-weight: 600;
+                    transition: transform 0.3s;
+                }
+                .welcome-box a:hover {
+                    transform: translateY(-2px);
+                }
+                .info {
+                    margin-top: 30px;
+                    padding: 20px;
+                    background: #f7fafc;
+                    border-radius: 6px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="welcome-box">
+                <h1>🤖 SmartQ</h1>
+                <p><strong>Advanced AI Assistant by homemovie</strong></p>
+                <p>Transformer-based language model with a beautiful web interface</p>
+                
+                <div class="info">
+                    <h3>📌 About This Deployment</h3>
+                    <p>This is a static GitHub Pages deployment of SmartQ.</p>
+                    <p>To run the full application with AI capabilities, use the local setup:</p>
+                    <pre style="background: #2d3748; color: #e2e8f0; padding: 15px; border-radius: 4px; text-align: left;">
+git clone https://github.com/omidomidvari/smart-q.git
+cd smart-q
+pip install -r requirements.txt
+python app.py</pre>
+                    <p>Then visit <code>http://localhost:5000</code></p>
+                </div>
+                
+                <a href="https://github.com/omidomidvari/smart-q">View on GitHub</a>
+            </div>
+        </body>
+        </html>
+        EOF
+    
+    - name: Setup Pages
+      uses: actions/configure-pages@v3
+    
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: '_site'
+    
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v2
+    
+    - name: Create deployment summary
+      run: |
+        echo "## ✅ SmartQ GitHub Pages Deployment" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status**: Successfully deployed" >> $GITHUB_STEP_SUMMARY
+        echo "- **URL**: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🚀 Local Development" >> $GITHUB_STEP_SUMMARY
+        echo "To run the full application locally:" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+        echo "git clone https://github.com/${{ github.repository }}.git" >> $GITHUB_STEP_SUMMARY
+        echo "cd smart-q" >> $GITHUB_STEP_SUMMARY
+        echo "pip install -r requirements.txt" >> $GITHUB_STEP_SUMMARY
+        echo "python app.py" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
